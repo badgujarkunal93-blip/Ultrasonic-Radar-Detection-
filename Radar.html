@@ -1,0 +1,1585 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — Ultrasonic Radar System</title>
+<meta name="theme-color" content="#03080f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SENTINEL Radar">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="ProfilePicture.png">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg:        #03080f;
+  --surface:   #060f1a;
+  --border:    rgba(0,180,255,0.12);
+  --accent:    #00b4ff;
+  --accent2:   #00ffcc;
+  --danger:    #ff2d55;
+  --warn:      #ffaa00;
+  --text:      #a8d4f0;
+  --text-dim:  #3a6a8a;
+  --text-bright: #e8f4ff;
+  --sweep:     #00ffcc;
+  --object:    #ff2d55;
+  --glow-a:    rgba(0,180,255,0.15);
+  --glow-s:    rgba(0,255,204,0.2);
+}
+
+html, body { width:100%; height:100%; overflow:hidden; }
+
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--text);
+  display: grid;
+  grid-template-rows: 56px 1fr 44px;
+  grid-template-columns: 260px 1fr 260px;
+  grid-template-areas:
+    "header header header"
+    "left   radar  right"
+    "footer footer footer";
+}
+
+/* ─── SCANLINES ─────────────────────────────────────────── */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px, transparent 3px,
+    rgba(0,180,255,0.012) 3px, rgba(0,180,255,0.012) 4px
+  );
+  pointer-events:none; z-index:9999;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────── */
+header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, #040d18 0%, #060f1a 100%);
+  position: relative;
+  z-index: 10;
+}
+
+header::before {
+  content:'';
+  position:absolute;
+  bottom:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent), transparent);
+  opacity:0.4;
+}
+
+.logo-block { display:flex; align-items:center; gap:14px; }
+
+.logo-icon {
+  width:32px; height:32px;
+  border:1.5px solid var(--accent);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+  box-shadow: 0 0 12px rgba(0,180,255,0.3), inset 0 0 8px rgba(0,180,255,0.1);
+}
+.logo-icon::after {
+  content:'';
+  width:6px; height:6px;
+  background:var(--accent2);
+  border-radius:50%;
+  box-shadow: 0 0 8px var(--accent2);
+  animation: pulse-center 2s ease-in-out infinite;
+}
+@keyframes pulse-center { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.6)} }
+
+.logo-text {
+  font-family:'Orbitron',monospace;
+  font-size:18px; font-weight:900;
+  color:var(--text-bright);
+  letter-spacing:5px;
+  text-shadow: 0 0 20px rgba(0,180,255,0.5);
+}
+.logo-sub {
+  font-size:9px; letter-spacing:3px;
+  color:var(--text-dim); margin-top:2px;
+}
+
+.header-center {
+  display:flex; gap:32px; align-items:center;
+}
+.hstat {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.hstat-label { font-size:8px; letter-spacing:3px; color:var(--text-dim); }
+.hstat-value { font-size:12px; color:var(--accent); font-family:'Orbitron',monospace; }
+
+.header-right { display:flex; align-items:center; gap:16px; }
+
+#clock {
+  font-family:'Orbitron',monospace;
+  font-size:15px; color:var(--accent2);
+  text-shadow: 0 0 10px rgba(0,255,204,0.4);
+  letter-spacing:2px;
+}
+
+/* Connect button */
+#btnConnect {
+  padding: 8px 20px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family:'Share Tech Mono',monospace;
+  font-size:11px; letter-spacing:2px;
+  cursor:pointer;
+  position:relative;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  transition: all 0.2s;
+}
+#btnConnect:hover, #btnConnect.live {
+  background: rgba(0,180,255,0.15);
+  box-shadow: 0 0 20px rgba(0,180,255,0.3);
+  color: var(--text-bright);
+}
+#btnConnect.live {
+  border-color: var(--accent2);
+  color: var(--accent2);
+  box-shadow: 0 0 20px rgba(0,255,204,0.3);
+}
+#btnConnect.disconnecting {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.conn-indicator {
+  display:flex; align-items:center; gap:8px;
+  font-size:10px; letter-spacing:2px; color:var(--text-dim);
+}
+.conn-dot {
+  width:7px; height:7px; border-radius:50%;
+  background: var(--text-dim);
+  transition: all 0.4s;
+}
+.conn-dot.live { background:var(--accent2); box-shadow:0 0 8px var(--accent2); animation:blink-dot 1.5s infinite; }
+.conn-dot.sim  { background:var(--warn); box-shadow:0 0 6px var(--warn); }
+@keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ─── PANELS ─────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.panel.right { border-right:none; border-left:1px solid var(--border); }
+
+.panel-header {
+  padding:14px 18px 10px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:8px;
+}
+.panel-header-icon {
+  width:3px; height:14px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2));
+  border-radius:2px;
+}
+.panel-title {
+  font-size:9px; letter-spacing:3px;
+  color:var(--text-dim); text-transform:uppercase;
+}
+
+.panel-body { flex:1; padding:16px; display:flex; flex-direction:column; gap:14px; overflow:hidden; }
+
+/* Metric cards */
+.metric-card {
+  background: rgba(0,180,255,0.04);
+  border:1px solid var(--border);
+  padding:10px 14px;
+  position:relative;
+  overflow:hidden;
+}
+.metric-card::before {
+  content:'';
+  position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:linear-gradient(180deg,var(--accent),transparent);
+}
+.mc-label { font-size:8px; letter-spacing:3px; color:var(--text-dim); margin-bottom:4px; }
+.mc-value {
+  font-family:'Orbitron',monospace;
+  font-size:22px; font-weight:700;
+  color:var(--text-bright);
+  text-shadow: 0 0 12px rgba(0,180,255,0.3);
+  transition: color 0.3s, text-shadow 0.3s;
+}
+.mc-value.danger { color:var(--danger); text-shadow:0 0 12px rgba(255,45,85,0.5); }
+.mc-value.warn   { color:var(--warn);   text-shadow:0 0 12px rgba(255,170,0,0.5); }
+.mc-value.good   { color:var(--accent2);text-shadow:0 0 12px rgba(0,255,204,0.4); }
+.mc-unit { font-size:10px; color:var(--text-dim); margin-left:4px; }
+
+/* Status badge */
+.status-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 10px;
+  border-radius:2px;
+  font-size:10px; letter-spacing:2px;
+  font-weight:600;
+  transition:all 0.3s;
+}
+.status-badge.clear   { background:rgba(0,180,255,0.08); border:1px solid rgba(0,180,255,0.2); color:var(--accent); }
+.status-badge.warn    { background:rgba(255,170,0,0.08); border:1px solid rgba(255,170,0,0.3); color:var(--warn); }
+.status-badge.danger  { background:rgba(255,45,85,0.1);  border:1px solid rgba(255,45,85,0.4); color:var(--danger); animation:flash-badge 0.4s infinite; }
+@keyframes flash-badge { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* Zone bars */
+.zone-section { display:flex; flex-direction:column; gap:8px; }
+.zone-row { display:flex; flex-direction:column; gap:4px; }
+.zone-label-row { display:flex; justify-content:space-between; font-size:9px; }
+.zone-name { color:var(--text-dim); letter-spacing:2px; }
+.zone-pct  { color:var(--text); }
+.zone-track {
+  height:3px; background:rgba(255,255,255,0.05);
+  border-radius:2px; overflow:hidden;
+}
+.zone-fill { height:100%; border-radius:2px; transition:width 0.5s ease; width:0%; }
+.zone-fill.close { background:linear-gradient(90deg,var(--danger),#ff6680); }
+.zone-fill.mid   { background:linear-gradient(90deg,var(--warn),#ffd060); }
+.zone-fill.far   { background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+
+/* Controls */
+.ctrl-group { display:flex; flex-direction:column; gap:8px; }
+
+.btn {
+  width:100%;
+  padding:9px 14px;
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--text);
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:2px;
+  cursor:pointer;
+  text-align:left;
+  display:flex; align-items:center; gap:8px;
+  transition:all 0.2s;
+  position:relative;
+  overflow:hidden;
+}
+.btn::before {
+  content:'';
+  position:absolute; left:0; top:0; bottom:0; width:0;
+  background:rgba(0,180,255,0.08);
+  transition:width 0.2s;
+}
+.btn:hover::before { width:100%; }
+.btn:hover { border-color:rgba(0,180,255,0.3); color:var(--text-bright); }
+.btn.active { border-color:var(--accent2); color:var(--accent2); background:rgba(0,255,204,0.06); }
+.btn.red { border-color:rgba(255,45,85,0.2); color:rgba(255,45,85,0.6); }
+.btn.red:hover { border-color:var(--danger); color:var(--danger); }
+.btn-icon { font-size:12px; flex-shrink:0; }
+
+.slider-ctrl { display:flex; flex-direction:column; gap:5px; }
+.slider-top  { display:flex; justify-content:space-between; font-size:9px; letter-spacing:2px; }
+.slider-key  { color:var(--text-dim); }
+.slider-val  { color:var(--accent); }
+input[type=range] {
+  width:100%; height:2px; accent-color:var(--accent);
+  background:rgba(0,180,255,0.15);
+  outline:none; border:none; cursor:pointer;
+}
+
+/* ─── LOG ───────────────────────────────────────────────── */
+.log-wrap {
+  flex:1;
+  border:1px solid var(--border);
+  position:relative;
+  overflow:hidden;
+  min-height:0;
+}
+.log-wrap::before {
+  content:'DETECTION LOG';
+  position:absolute; top:-8px; left:12px;
+  background:var(--surface); padding:0 6px;
+  font-size:8px; letter-spacing:3px; color:var(--text-dim);
+  z-index:2;
+}
+.log-inner {
+  position:absolute; inset:0;
+  padding:14px 10px 8px;
+  overflow-y:auto;
+  display:flex; flex-direction:column; gap:2px;
+}
+.log-inner::-webkit-scrollbar { width:2px; }
+.log-inner::-webkit-scrollbar-thumb { background:var(--border); }
+
+.log-entry {
+  display:grid;
+  grid-template-columns:40px 1fr 60px;
+  gap:6px;
+  padding:4px 6px;
+  font-size:9px;
+  border-bottom:1px solid rgba(0,180,255,0.04);
+  animation:slidein 0.2s ease;
+}
+@keyframes slidein { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:none} }
+.log-ang  { color:var(--accent); }
+.log-dist { color:var(--danger); font-weight:bold; }
+.log-time { color:var(--text-dim); text-align:right; font-size:8px; }
+
+/* Stats grid */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.stat-box {
+  background:rgba(0,0,0,0.3);
+  border:1px solid var(--border);
+  padding:8px 10px;
+}
+.stat-box-label { font-size:7px; letter-spacing:2px; color:var(--text-dim); margin-bottom:3px; }
+.stat-box-value { font-size:14px; color:var(--text-bright); font-family:'Orbitron',monospace; }
+
+/* ─── RADAR CENTER ───────────────────────────────────────── */
+.radar-area {
+  grid-area: radar;
+  display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 100%, rgba(0,180,255,0.04) 0%, transparent 70%),
+    var(--bg);
+  position:relative;
+  overflow:hidden;
+}
+
+/* Corner decorations */
+.corner { position:absolute; width:30px; height:30px; }
+.corner-tl { top:16px; left:16px; border-top:1px solid var(--accent); border-left:1px solid var(--accent); }
+.corner-tr { top:16px; right:16px; border-top:1px solid var(--accent); border-right:1px solid var(--accent); }
+.corner-bl { bottom:16px; left:16px; border-bottom:1px solid var(--accent); border-left:1px solid var(--accent); }
+.corner-br { bottom:16px; right:16px; border-bottom:1px solid var(--accent); border-right:1px solid var(--accent); }
+
+.radar-canvas-wrap {
+  position:relative;
+  width: min(75vh, 560px);
+  height: min(75vh, 560px);
+}
+
+#radarCanvas { width:100%; height:100%; display:block; }
+
+/* Object popup */
+.obj-popup {
+  position:absolute;
+  right:20px; top:20px;
+  background:rgba(3,8,15,0.92);
+  border:1px solid var(--danger);
+  padding:10px 16px;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.2s;
+  box-shadow:0 0 24px rgba(255,45,85,0.2);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%);
+}
+.obj-popup.show { opacity:1; }
+.obj-popup-label { font-size:8px; letter-spacing:3px; color:var(--danger); margin-bottom:4px; }
+.obj-popup-value { font-size:16px; color:#fff; font-family:'Orbitron',monospace; }
+
+/* Alert flash overlay */
+.alert-flash {
+  position:fixed; inset:0;
+  background:rgba(255,45,85,0.05);
+  pointer-events:none; opacity:0; z-index:998;
+}
+.alert-flash.on { opacity:1; }
+
+/* ─── FOOTER ─────────────────────────────────────────────── */
+footer {
+  grid-area: footer;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 28px;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  font-size:9px; letter-spacing:2px; color:var(--text-dim);
+}
+footer::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:0.2;
+}
+.footer-sweep {
+  display:flex; align-items:center; gap:12px; flex:1; max-width:360px;
+}
+.sweep-track {
+  flex:1; height:2px; background:rgba(0,180,255,0.1);
+  position:relative;
+}
+.sweep-fill {
+  position:absolute; left:0; top:0; height:100%;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  box-shadow:0 0 6px var(--accent);
+  transition:width 0.05s linear;
+}
+#sweepPct { color:var(--accent); min-width:36px; text-align:right; }
+
+/* mode pill */
+.mode-pill {
+  padding:3px 10px;
+  font-size:9px; letter-spacing:2px;
+  border-radius:20px;
+  transition:all 0.3s;
+}
+.mode-pill.sim  { background:rgba(255,170,0,0.1); border:1px solid rgba(255,170,0,0.3); color:var(--warn); }
+.mode-pill.live { background:rgba(0,255,204,0.1); border:1px solid rgba(0,255,204,0.3); color:var(--accent2); }
+
+/* no-serial warning */
+#noSerialWarn {
+  display:none;
+  position:fixed;
+  bottom:60px; left:50%; transform:translateX(-50%);
+  background:rgba(255,170,0,0.1); border:1px solid var(--warn);
+  color:var(--warn); padding:10px 20px;
+  font-size:10px; letter-spacing:2px;
+  z-index:100;
+}
+
+/* Clean UI refresh */
+:root {
+  --bg:#f5f7fb;
+  --surface:#ffffff;
+  --surface-soft:#eef4fb;
+  --border:#dce5ef;
+  --accent:#2563eb;
+  --accent2:#14b8a6;
+  --danger:#e11d48;
+  --warn:#d97706;
+  --text:#243244;
+  --text-dim:#6b7a90;
+  --text-bright:#0f172a;
+}
+
+html, body {
+  min-height:100%;
+  overflow:auto;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37,99,235,0.10), transparent 34rem),
+    linear-gradient(135deg, #f8fbff 0%, #eef4fb 100%);
+  color:var(--text);
+  font-family:'Rajdhani', system-ui, sans-serif;
+  grid-template-rows:auto 1fr auto;
+  grid-template-columns:280px minmax(360px,1fr) 300px;
+  gap:18px;
+  padding:18px;
+  letter-spacing:0;
+}
+
+body::after,
+header::before,
+footer::before,
+.corner,
+.metric-card::before,
+.btn::before,
+.logo-icon::after {
+  display:none;
+}
+
+header,
+.panel,
+.radar-area,
+footer {
+  background:rgba(255,255,255,0.86);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:0 18px 50px rgba(15,23,42,0.08);
+}
+
+header {
+  min-height:76px;
+  padding:14px 18px;
+  gap:18px;
+}
+
+.logo-block { gap:12px; }
+
+.logo-icon {
+  width:42px;
+  height:42px;
+  border:0;
+  border-radius:14px;
+  background:linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow:none;
+}
+
+.logo-icon::before {
+  content:'';
+  width:16px;
+  height:16px;
+  border:3px solid #fff;
+  border-radius:50%;
+}
+
+.logo-text {
+  color:var(--text-bright);
+  font-family:'Orbitron', monospace;
+  font-size:20px;
+  letter-spacing:1px;
+  text-shadow:none;
+}
+
+.logo-sub,
+.hstat-label,
+.mc-label,
+.panel-title,
+.slider-key,
+.stat-box-label,
+.zone-name {
+  color:var(--text-dim);
+  letter-spacing:.08em;
+}
+
+.logo-sub { font-size:11px; }
+
+.header-center {
+  flex:1;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.hstat {
+  min-width:88px;
+  align-items:flex-start;
+  padding:8px 10px;
+  background:var(--surface-soft);
+  border:1px solid var(--border);
+  border-radius:12px;
+}
+
+.hstat-value,
+#clock,
+.stat-box-value,
+.mc-value {
+  color:var(--text-bright);
+  font-family:'Orbitron', monospace;
+  text-shadow:none;
+}
+
+.hstat-value { font-size:13px; }
+
+.header-right {
+  gap:12px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.conn-indicator {
+  color:var(--text);
+  font-size:12px;
+  letter-spacing:.08em;
+}
+
+.conn-dot {
+  width:9px;
+  height:9px;
+  box-shadow:none;
+}
+
+.conn-dot.sim { background:var(--warn); box-shadow:none; }
+.conn-dot.live { background:var(--accent2); box-shadow:0 0 0 5px rgba(20,184,166,0.16); }
+
+#clock {
+  min-width:82px;
+  padding:8px 10px;
+  background:var(--surface-soft);
+  border-radius:10px;
+  font-size:13px;
+  text-align:center;
+}
+
+#btnConnect,
+.btn {
+  border:0;
+  border-radius:12px;
+  clip-path:none;
+  background:var(--text-bright);
+  color:#fff;
+  font-family:'Rajdhani', system-ui, sans-serif;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.06em;
+  text-align:center;
+  justify-content:center;
+  box-shadow:0 10px 24px rgba(15,23,42,0.14);
+}
+
+#btnConnect {
+  min-height:40px;
+  padding:10px 18px;
+}
+
+#btnConnect:hover,
+#btnConnect.live,
+.btn:hover,
+.btn.active {
+  background:var(--accent);
+  color:#fff;
+  border:0;
+  box-shadow:0 12px 28px rgba(37,99,235,0.25);
+}
+
+#btnConnect.live {
+  background:var(--danger);
+}
+
+.panel {
+  min-height:0;
+  overflow:hidden;
+}
+
+.panel.right {
+  border:1px solid var(--border);
+}
+
+.panel-header {
+  padding:16px 18px 10px;
+  border-bottom:0;
+}
+
+.panel-header-icon {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent2);
+}
+
+.panel-title {
+  color:var(--text-bright);
+  font-size:13px;
+  font-weight:700;
+}
+
+.panel-body {
+  padding:14px 18px 18px;
+  gap:14px;
+  overflow:auto;
+}
+
+.metric-card,
+.stat-box,
+.zone-section,
+.slider-ctrl,
+.log-wrap {
+  background:var(--surface-soft);
+  border:1px solid var(--border);
+  border-radius:14px;
+}
+
+.metric-card {
+  padding:14px;
+}
+
+.mc-label {
+  font-size:11px;
+  margin-bottom:6px;
+}
+
+.mc-value {
+  font-size:28px;
+}
+
+.mc-value.danger { color:var(--danger); text-shadow:none; }
+.mc-value.warn { color:var(--warn); text-shadow:none; }
+.mc-value.good { color:var(--accent2); text-shadow:none; }
+.mc-unit { color:var(--text-dim); }
+
+.status-badge {
+  width:100%;
+  justify-content:center;
+  border-radius:12px;
+  padding:11px 12px;
+  font-size:13px;
+  letter-spacing:.08em;
+}
+
+.status-badge.clear { background:rgba(37,99,235,0.09); border:1px solid rgba(37,99,235,0.18); color:var(--accent); }
+.status-badge.warn { background:rgba(217,119,6,0.10); border:1px solid rgba(217,119,6,0.24); color:var(--warn); }
+.status-badge.danger { background:rgba(225,29,72,0.10); border:1px solid rgba(225,29,72,0.24); color:var(--danger); }
+
+.zone-section {
+  padding:14px;
+}
+
+.zone-track,
+.sweep-track {
+  height:7px;
+  background:#dbe5ef;
+  border-radius:999px;
+}
+
+.zone-fill,
+.sweep-fill {
+  border-radius:999px;
+}
+
+.ctrl-group {
+  gap:10px;
+}
+
+.btn {
+  min-height:40px;
+  padding:10px 14px;
+  background:#f8fafc;
+  color:var(--text-bright);
+  border:1px solid var(--border);
+  box-shadow:none;
+}
+
+.btn.red {
+  color:var(--danger);
+  border-color:rgba(225,29,72,0.18);
+}
+
+.btn.red:hover {
+  background:var(--danger);
+  color:#fff;
+}
+
+.slider-ctrl,
+.sound-file {
+  padding:14px;
+}
+
+.slider-top,
+.zone-label-row {
+  font-size:12px;
+  letter-spacing:0;
+}
+
+input[type=range] {
+  height:6px;
+  accent-color:var(--accent);
+}
+
+.sound-file {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.file-picker {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:40px;
+  padding:10px 14px;
+  border:1px dashed rgba(37,99,235,0.35);
+  border-radius:12px;
+  background:#f8fafc;
+  color:var(--accent);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.06em;
+  cursor:pointer;
+  transition:all .2s;
+}
+
+.file-picker:hover {
+  background:rgba(37,99,235,0.08);
+  border-color:var(--accent);
+}
+
+#soundFileInput {
+  display:none;
+}
+
+.stats-grid {
+  gap:10px;
+}
+
+.stat-box {
+  padding:12px;
+}
+
+.stat-box-value {
+  font-size:18px;
+}
+
+.log-wrap {
+  min-height:180px;
+}
+
+.log-wrap::before {
+  background:var(--surface-soft);
+  color:var(--text-dim);
+}
+
+.log-entry {
+  grid-template-columns:48px 1fr 68px;
+  padding:7px 6px;
+  font-size:12px;
+  border-bottom:1px solid var(--border);
+}
+
+.log-time {
+  font-size:11px;
+}
+
+.radar-area {
+  background:
+    radial-gradient(circle at 50% 75%, rgba(20,184,166,0.12), transparent 22rem),
+    linear-gradient(180deg, #ffffff 0%, #f4f8fc 100%);
+}
+
+.radar-canvas-wrap {
+  width:min(68vh, 620px, 92%);
+  height:min(68vh, 620px, 92vw);
+}
+
+.obj-popup {
+  top:18px;
+  right:18px;
+  background:#fff;
+  border:1px solid rgba(225,29,72,0.25);
+  border-radius:14px;
+  clip-path:none;
+  box-shadow:0 18px 40px rgba(225,29,72,0.14);
+}
+
+.obj-popup-label {
+  color:var(--danger);
+  letter-spacing:.08em;
+}
+
+.obj-popup-value {
+  color:var(--text-bright);
+}
+
+footer {
+  min-height:54px;
+  padding:12px 18px;
+  gap:14px;
+  flex-wrap:wrap;
+  font-size:12px;
+  letter-spacing:0;
+}
+
+.footer-sweep {
+  max-width:420px;
+}
+
+.mode-pill {
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:12px;
+  letter-spacing:.06em;
+  font-weight:700;
+}
+
+.mode-pill.sim { background:rgba(217,119,6,0.10); border:1px solid rgba(217,119,6,0.22); color:var(--warn); }
+.mode-pill.live { background:rgba(20,184,166,0.12); border:1px solid rgba(20,184,166,0.24); color:var(--accent2); }
+
+#noSerialWarn {
+  bottom:24px;
+  background:#fff7ed;
+  border:1px solid rgba(217,119,6,0.28);
+  border-radius:14px;
+  color:var(--warn);
+  box-shadow:0 16px 36px rgba(15,23,42,0.12);
+  font-size:13px;
+  letter-spacing:.02em;
+}
+
+@media (max-width: 1120px) {
+  body {
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "header header"
+      "radar radar"
+      "left right"
+      "footer footer";
+  }
+
+  .radar-canvas-wrap {
+    height:min(64vh, 560px, 88vw);
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    display:flex;
+    flex-direction:column;
+    padding:12px;
+    gap:12px;
+  }
+
+  header,
+  footer {
+    align-items:flex-start;
+  }
+
+  header {
+    flex-direction:column;
+  }
+
+  .header-center,
+  .header-right {
+    width:100%;
+    justify-content:flex-start;
+  }
+
+  .hstat {
+    flex:1 1 42%;
+  }
+
+  .radar-area {
+    min-height:430px;
+  }
+
+  .radar-canvas-wrap {
+    width:100%;
+    height:390px;
+  }
+
+  footer {
+    flex-direction:column;
+  }
+
+  .footer-sweep {
+    width:100%;
+    max-width:none;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="alert-flash" id="alertFlash"></div>
+<div id="noSerialWarn">⚠ WEB SERIAL NOT SUPPORTED — USE GOOGLE CHROME</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-block">
+    <div class="logo-icon"><div></div></div>
+    <div>
+      <div class="logo-text">SENTINEL</div>
+      <div class="logo-sub">ULTRASONIC RADAR SYSTEM · HC-SR04</div>
+    </div>
+  </div>
+
+  <div class="header-center">
+    <div class="hstat"><div class="hstat-label">FREQUENCY</div><div class="hstat-value">40kHz</div></div>
+    <div class="hstat"><div class="hstat-label">MAX RANGE</div><div class="hstat-value" id="hRange">200cm</div></div>
+    <div class="hstat"><div class="hstat-label">SCANS</div><div class="hstat-value" id="hScans">0</div></div>
+    <div class="hstat"><div class="hstat-label">OBJECTS</div><div class="hstat-value" id="hObjs">0</div></div>
+  </div>
+
+  <div class="header-right">
+    <div class="conn-indicator">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connLabel">OFFLINE</span>
+    </div>
+    <div id="clock">00:00:00</div>
+    <button id="btnConnect" onclick="toggleConnect()">⚡ CONNECT</button>
+  </div>
+</header>
+
+<!-- LEFT PANEL -->
+<div class="panel" style="grid-area:left">
+  <div class="panel-header">
+    <div class="panel-header-icon"></div>
+    <div class="panel-title">Live Telemetry</div>
+  </div>
+  <div class="panel-body">
+
+    <div class="metric-card">
+      <div class="mc-label">SERVO ANGLE</div>
+      <div class="mc-value" id="mAngle">—<span class="mc-unit">°</span></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="mc-label">DISTANCE</div>
+      <div class="mc-value" id="mDist">—<span class="mc-unit">cm</span></div>
+    </div>
+
+    <div>
+      <div class="mc-label" style="margin-bottom:8px">THREAT STATUS</div>
+      <div class="status-badge clear" id="statusBadge">
+        <span id="statusDot">●</span>
+        <span id="statusText">CLEAR</span>
+      </div>
+    </div>
+
+    <div class="zone-section">
+      <div class="mc-label">ZONE ACTIVITY</div>
+      <div class="zone-row">
+        <div class="zone-label-row"><span class="zone-name">CLOSE · 0–70cm</span><span class="zone-pct" id="zpClose">0%</span></div>
+        <div class="zone-track"><div class="zone-fill close" id="zbClose"></div></div>
+      </div>
+      <div class="zone-row">
+        <div class="zone-label-row"><span class="zone-name">MID · 70–140cm</span><span class="zone-pct" id="zpMid">0%</span></div>
+        <div class="zone-track"><div class="zone-fill mid" id="zbMid"></div></div>
+      </div>
+      <div class="zone-row">
+        <div class="zone-label-row"><span class="zone-name">FAR · 140–200cm</span><span class="zone-pct" id="zpFar">0%</span></div>
+        <div class="zone-track"><div class="zone-fill far" id="zbFar"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RADAR -->
+<div class="radar-area" style="grid-area:radar">
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="radar-canvas-wrap">
+    <canvas id="radarCanvas"></canvas>
+    <div class="obj-popup" id="objPopup">
+      <div class="obj-popup-label">OBJECT DETECTED</div>
+      <div class="obj-popup-value" id="objPopupVal">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="panel right" style="grid-area:right">
+  <div class="panel-header">
+    <div class="panel-header-icon"></div>
+    <div class="panel-title">Controls & Stats</div>
+  </div>
+  <div class="panel-body">
+
+    <div class="ctrl-group">
+      <button class="btn active" id="btnScan" onclick="toggleScan()"><span class="btn-icon">⏸</span>PAUSE SCAN</button>
+      <button class="btn" onclick="clearData()"><span class="btn-icon">↺</span>CLEAR MAP</button>
+      <button class="btn red" onclick="clearLog()"><span class="btn-icon">✕</span>CLEAR LOG</button>
+    </div>
+
+    <div class="slider-ctrl">
+      <div class="slider-top"><span class="slider-key">SWEEP SPEED</span><span class="slider-val" id="svSpeed">2×</span></div>
+      <input type="range" min="1" max="5" value="2" oninput="speedMult=+this.value;document.getElementById('svSpeed').textContent=this.value+'×'">
+    </div>
+
+    <div class="slider-ctrl">
+      <div class="slider-top"><span class="slider-key">MAX RANGE</span><span class="slider-val" id="svRange">200cm</span></div>
+      <input type="range" min="50" max="200" step="10" value="200" oninput="maxRange=+this.value;document.getElementById('svRange').textContent=this.value+'cm';document.getElementById('hRange').textContent=this.value+'cm';clearData();">
+    </div>
+
+    <div class="sound-file">
+      <div class="slider-top"><span class="slider-key">ALERT SOUND</span><span class="slider-val" id="soundFileName">No file</span></div>
+      <label class="file-picker" for="soundFileInput">Choose audio file</label>
+      <input id="soundFileInput" type="file" accept="audio/*" onchange="handleSoundFile(this)">
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-box-label">TOTAL DET</div><div class="stat-box-value" id="sTot">0</div></div>
+      <div class="stat-box"><div class="stat-box-label">AVG DIST</div><div class="stat-box-value" id="sAvg">—</div></div>
+      <div class="stat-box"><div class="stat-box-label">MIN DIST</div><div class="stat-box-value" id="sMin">—</div></div>
+      <div class="stat-box"><div class="stat-box-label">MAX DIST</div><div class="stat-box-value" id="sMax">—</div></div>
+    </div>
+
+    <div class="log-wrap">
+      <div class="log-inner" id="logInner"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-sweep">
+    <span style="min-width:52px">SWEEP</span>
+    <div class="sweep-track"><div class="sweep-fill" id="sweepFill" style="width:0%"></div></div>
+    <span id="sweepPct">0%</span>
+  </div>
+  <div style="letter-spacing:3px">SENTINEL · HC-SR04 + SG90 · ARDUINO UNO</div>
+  <div class="mode-pill sim" id="modePill">● OFFLINE</div>
+</footer>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────
+const canvas = document.getElementById('radarCanvas');
+const ctx    = canvas.getContext('2d');
+
+let angle       = 0;
+let direction   = 1;
+let scanning    = true;
+let maxRange    = 200;
+let speedMult   = 2;
+let scanCount   = 0;
+let detCount    = 0;
+let distances   = new Array(181).fill(0);
+let trailData   = [];
+let allDets     = [];
+let lastDetTime = 0;
+let isLive      = false;
+let serialPort  = null;
+let serialReader = null;
+let serialInputDone = null;
+let serialBuf   = '';
+let popupTimer  = null;
+let alertSoundUrl = null;
+let alertAudio = null;
+
+// ─── CANVAS RESIZE ───────────────────────────────────────────
+function resize() {
+  const wrap = canvas.parentElement;
+  const s = Math.min(wrap.clientWidth, wrap.clientHeight);
+  canvas.width = s; canvas.height = s;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── ALERT AUDIO (only plays when live) ──────────────────────
+function handleSoundFile(input) {
+  const file = input.files && input.files[0];
+  const label = document.getElementById('soundFileName');
+
+  if (alertSoundUrl) URL.revokeObjectURL(alertSoundUrl);
+  alertSoundUrl = file ? URL.createObjectURL(file) : null;
+  alertAudio = alertSoundUrl ? new Audio(alertSoundUrl) : null;
+  if (alertAudio) alertAudio.preload = 'auto';
+  label.textContent = file ? file.name : 'No file';
+}
+
+function playAlertSound(dist) {
+  if (!isLive || !alertAudio) return;
+
+  try {
+    alertAudio.volume = dist < 50 ? 1 : dist < 100 ? 0.75 : 0.5;
+    alertAudio.currentTime = 0;
+    alertAudio.play().catch(() => {});
+  } catch(e){}
+}
+
+// ─── SERIAL CONNECT ──────────────────────────────────────────
+async function toggleConnect() {
+  if (isLive) { await doDisconnect(); return; }
+
+  if (!('serial' in navigator)) {
+    document.getElementById('noSerialWarn').style.display = 'block';
+    setTimeout(()=>document.getElementById('noSerialWarn').style.display='none', 4000);
+    return;
+  }
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 9600 });
+    isLive = true;
+    setLiveUI(true);
+    readSerial();
+  } catch(e) {
+    if (e.name !== 'NotFoundError') alert('Connection error: ' + e.message);
+  }
+}
+
+async function doDisconnect() {
+  isLive = false;
+  setLiveUI(false);
+
+  if (serialReader) {
+    try { await serialReader.cancel(); } catch(e) {}
+    try { serialReader.releaseLock(); } catch(e) {}
+    serialReader = null;
+  }
+
+  if (serialInputDone) {
+    try { await serialInputDone; } catch(e) {}
+    serialInputDone = null;
+  }
+
+  if (serialPort) {
+    try { await serialPort.close(); } catch(e){}
+  }
+  serialPort = null;
+  serialBuf = '';
+}
+
+function setLiveUI(live) {
+  const btn  = document.getElementById('btnConnect');
+  const dot  = document.getElementById('connDot');
+  const lbl  = document.getElementById('connLabel');
+  const pill = document.getElementById('modePill');
+
+  if (live) {
+    btn.textContent = '✕ DISCONNECT';
+    btn.className   = 'live';
+    dot.className   = 'conn-dot live';
+    lbl.textContent = 'ARDUINO LIVE';
+    pill.className  = 'mode-pill live';
+    pill.textContent= '● LIVE';
+  } else {
+    btn.textContent = '⚡ CONNECT';
+    btn.className   = '';
+    dot.className   = 'conn-dot sim';
+    lbl.textContent = 'OFFLINE';
+    pill.className  = 'mode-pill sim';
+    clearData();
+    updateMetrics(angle, 0);
+    pill.textContent= '● OFFLINE';
+  }
+}
+
+// ─── SERIAL READ ─────────────────────────────────────────────
+async function readSerial() {
+  const port = serialPort;
+  const tds = new TextDecoderStream();
+  serialInputDone = port.readable.pipeTo(tds.writable).catch(() => {});
+  serialReader = tds.readable.getReader();
+  try {
+    while (true) {
+      const { value, done } = await serialReader.read();
+      if (done) break;
+      serialBuf += value;
+      const lines = serialBuf.split('\n');
+      serialBuf = lines.pop();
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t || t === 'RADAR_START') continue;
+        const parts = t.split(',');
+        if (parts.length === 2) {
+          const a = parseInt(parts[0]);
+          const d = parseInt(parts[1]);
+          if (!isNaN(a) && !isNaN(d)) ingest(a, d);
+        }
+      }
+    }
+  } catch(e) {
+    if (isLive) await doDisconnect();
+  } finally {
+    try { serialReader?.releaseLock(); } catch(e) {}
+    serialReader = null;
+  }
+}
+
+// ─── INGEST (from Arduino serial data) ─────────────────────
+function ingest(ang, dist) {
+  if (!scanning) return;
+
+  angle = ang;
+  if (ang === 0 || ang === 180) {
+    scanCount++;
+    document.getElementById('hScans').textContent = scanCount;
+  }
+
+  if (dist > 0 && dist <= maxRange) {
+    distances[ang] = dist;
+    trailData.push({ angle:ang, dist, time:Date.now() });
+    if (trailData.length > 400) trailData.shift();
+
+    if (Date.now() - lastDetTime > 120) {
+      lastDetTime = Date.now();
+      detCount++;
+      allDets.push(dist);
+      addLog(ang, dist);
+      updateMetrics(ang, dist);
+      updateStats();
+      updateZones();
+      flashAlert(dist);
+      playAlertSound(dist);
+      showPopup(ang, dist);
+    }
+  } else {
+    distances[ang] = 0;
+    updateMetrics(ang, 0);
+  }
+
+  // sweep progress
+  const pct = Math.round((ang/180)*100);
+  document.getElementById('sweepFill').style.width = pct+'%';
+  document.getElementById('sweepPct').textContent  = pct+'%';
+}
+
+function updateMetrics(ang, dist) {
+  document.getElementById('mAngle').innerHTML = ang+'<span class="mc-unit">°</span>';
+  const el = document.getElementById('mDist');
+  const badge = document.getElementById('statusBadge');
+  const stxt  = document.getElementById('statusText');
+
+  if (dist > 0) {
+    el.innerHTML = dist+'<span class="mc-unit">cm</span>';
+    if (dist < 50) {
+      el.className='mc-value danger';
+      badge.className='status-badge danger'; stxt.textContent='DANGER';
+    } else if (dist < 100) {
+      el.className='mc-value warn';
+      badge.className='status-badge warn'; stxt.textContent='WARNING';
+    } else {
+      el.className='mc-value good';
+      badge.className='status-badge clear'; stxt.textContent='DETECTED';
+    }
+  } else {
+    el.innerHTML = '—<span class="mc-unit">cm</span>';
+    el.className='mc-value';
+    badge.className='status-badge clear'; stxt.textContent='CLEAR';
+  }
+
+  const active = distances.filter(d=>d>0).length;
+  document.getElementById('hObjs').textContent = active;
+}
+
+function updateStats() {
+  document.getElementById('sTot').textContent = detCount;
+  if (allDets.length) {
+    document.getElementById('sMin').textContent = Math.round(Math.min(...allDets))+'cm';
+    document.getElementById('sMax').textContent = Math.round(Math.max(...allDets))+'cm';
+    document.getElementById('sAvg').textContent = Math.round(allDets.reduce((a,b)=>a+b,0)/allDets.length)+'cm';
+  }
+}
+
+function updateZones() {
+  const close = allDets.filter(d=>d<70).length;
+  const mid   = allDets.filter(d=>d>=70&&d<140).length;
+  const far   = allDets.filter(d=>d>=140).length;
+  const total = Math.max(1, close+mid+far);
+  const cp = Math.round(close/total*100), mp=Math.round(mid/total*100), fp=Math.round(far/total*100);
+  document.getElementById('zbClose').style.width=cp+'%';
+  document.getElementById('zbMid').style.width=mp+'%';
+  document.getElementById('zbFar').style.width=fp+'%';
+  document.getElementById('zpClose').textContent=cp+'%';
+  document.getElementById('zpMid').textContent=mp+'%';
+  document.getElementById('zpFar').textContent=fp+'%';
+}
+
+function addLog(ang, dist) {
+  const el = document.getElementById('logInner');
+  const d  = new Date();
+  const ts = [d.getHours(),d.getMinutes(),d.getSeconds()].map(v=>String(v).padStart(2,'0')).join(':');
+  const e  = document.createElement('div');
+  e.className='log-entry';
+  e.innerHTML=`<span class="log-ang">${ang}°</span><span class="log-dist">${dist}cm</span><span class="log-time">${ts}</span>`;
+  el.prepend(e);
+  if (el.children.length>60) el.removeChild(el.lastChild);
+}
+
+function showPopup(ang, dist) {
+  const p = document.getElementById('objPopup');
+  document.getElementById('objPopupVal').textContent = dist+'cm @ '+ang+'°';
+  p.classList.add('show');
+  clearTimeout(popupTimer);
+  popupTimer = setTimeout(()=>p.classList.remove('show'), 1500);
+}
+
+function flashAlert(dist) {
+  if (dist < 80) {
+    const fl = document.getElementById('alertFlash');
+    fl.style.opacity='1';
+    setTimeout(()=>fl.style.opacity='0',120);
+  }
+}
+
+function toggleScan() {
+  scanning = !scanning;
+  const b = document.getElementById('btnScan');
+  b.innerHTML = scanning
+    ? '<span class="btn-icon">⏸</span>PAUSE SCAN'
+    : '<span class="btn-icon">▶</span>RESUME SCAN';
+  b.className = scanning ? 'btn active' : 'btn';
+}
+
+function clearData() {
+  distances = new Array(181).fill(0);
+  trailData = [];
+}
+
+function clearLog() {
+  document.getElementById('logInner').innerHTML='';
+  allDets=[]; detCount=0; updateStats(); updateZones();
+}
+
+// ─── DRAW LOOP ────────────────────────────────────────────────
+function draw(ts) {
+  requestAnimationFrame(draw);
+
+  if (isLive) { drawRadar(); return; }
+
+  // Offline mode: draw the radar shell only. Real detections come from Arduino serial data.
+  drawRadar();
+}
+
+// ─── RADAR RENDERER ──────────────────────────────────────────
+function drawRadar() {
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H*0.92, R=W*0.455;
+
+  // Clear
+  ctx.fillStyle='#03080f';
+  ctx.fillRect(0,0,W,H);
+
+  // Ambient glow at base
+  const baseGlow=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.6);
+  baseGlow.addColorStop(0,'rgba(0,180,255,0.05)');
+  baseGlow.addColorStop(1,'transparent');
+  ctx.fillStyle=baseGlow;
+  ctx.fillRect(0,0,W,H);
+
+  // ---- Rings ----
+  for (let i=1;i<=4;i++) {
+    const r=R*i/4;
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,Math.PI,0,false);
+
+    // ring glow on innermost
+    if (i===1) {
+      ctx.strokeStyle='rgba(0,180,255,0.25)';
+      ctx.lineWidth=1;
+    } else {
+      ctx.strokeStyle=`rgba(0,180,255,${0.06+i*0.02})`;
+      ctx.lineWidth=0.5;
+    }
+    ctx.stroke();
+
+    // ring label
+    ctx.fillStyle='rgba(0,180,255,0.35)';
+    ctx.font=`10px 'Share Tech Mono'`;
+    ctx.textAlign='left';
+    const label = Math.round(maxRange*i/4)+'cm';
+    ctx.fillText(label, cx+r+4, cy-4);
+  }
+
+  // ---- Angle spokes ----
+  for (let a=0;a<=180;a+=30) {
+    const rad=a*Math.PI/180;
+    const ex=cx+R*Math.cos(Math.PI-rad);
+    const ey=cy-R*Math.sin(rad);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey);
+    ctx.strokeStyle=a%90===0?'rgba(0,180,255,0.15)':'rgba(0,180,255,0.07)';
+    ctx.lineWidth=0.5; ctx.stroke();
+
+    // angle label
+    const lx=cx+(R+16)*Math.cos(Math.PI-rad);
+    const ly=cy-(R+16)*Math.sin(rad);
+    ctx.fillStyle='rgba(0,180,255,0.45)';
+    ctx.font=`9px 'Share Tech Mono'`;
+    ctx.textAlign='center';
+    ctx.fillText(a+'°',lx,ly+4);
+  }
+  ctx.textAlign='left';
+
+  // ---- Baseline ----
+  ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy);
+  ctx.strokeStyle='rgba(0,180,255,0.2)'; ctx.lineWidth=1; ctx.stroke();
+
+  // ---- Trail objects (fading) ----
+  const now=Date.now();
+  for (const t of trailData) {
+    const age=(now-t.time)/3000;
+    if (age>1) continue;
+    const alpha=(1-age)*0.5;
+    const rad=t.angle*Math.PI/180;
+    const r=(t.dist/maxRange)*R;
+    const px=cx+r*Math.cos(Math.PI-rad);
+    const py=cy-r*Math.sin(rad);
+    ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,45,85,${alpha*0.6})`;
+    ctx.fill();
+  }
+
+  // ---- Current detections ----
+  for (let a=0;a<=180;a++) {
+    const d=distances[a];
+    if (!d||d>maxRange) continue;
+    const diff=Math.abs(a-angle);
+    if (diff>30) continue;
+    const fade=1-diff/30;
+    const rad=a*Math.PI/180;
+    const r=(d/maxRange)*R;
+    const px=cx+r*Math.cos(Math.PI-rad);
+    const py=cy-r*Math.sin(rad);
+
+    // glow
+    const gr=ctx.createRadialGradient(px,py,0,px,py,14);
+    gr.addColorStop(0,`rgba(255,45,85,${fade*0.7})`);
+    gr.addColorStop(1,'rgba(255,45,85,0)');
+    ctx.beginPath(); ctx.arc(px,py,14,0,Math.PI*2);
+    ctx.fillStyle=gr; ctx.fill();
+
+    // dot
+    ctx.beginPath(); ctx.arc(px,py,3.5,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,100,130,${fade})`;
+    ctx.fill();
+
+    // pulse on closest object
+    const active=distances.filter(x=>x>0);
+    if (active.length && d===Math.min(...active)) {
+      const p=(Math.sin(now/180)+1)/2;
+      ctx.beginPath(); ctx.arc(px,py,7+p*9,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(255,45,85,${0.5*(1-p)})`;
+      ctx.lineWidth=1.5; ctx.stroke();
+    }
+  }
+
+  // ---- Sweep glow sector ----
+  const sweepRad=angle*Math.PI/180;
+  for (let i=0;i<25;i++) {
+    const ta=sweepRad-(i*0.3*Math.PI/180)*direction;
+    const alpha=(1-i/25)*0.1;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,R,
+      Math.PI+ta-(0.3*Math.PI/180)*direction,
+      Math.PI+ta, direction<0);
+    ctx.closePath();
+    ctx.fillStyle=`rgba(0,255,204,${alpha})`;
+    ctx.fill();
+  }
+
+  // ---- Sweep line ----
+  const sx=cx+R*Math.cos(Math.PI-sweepRad);
+  const sy=cy-R*Math.sin(sweepRad);
+  const sg=ctx.createLinearGradient(cx,cy,sx,sy);
+  sg.addColorStop(0,'rgba(0,255,204,0.9)');
+  sg.addColorStop(0.6,'rgba(0,255,204,0.4)');
+  sg.addColorStop(1,'rgba(0,255,204,0.05)');
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(sx,sy);
+  ctx.strokeStyle=sg; ctx.lineWidth=2;
+  ctx.shadowColor='#00ffcc'; ctx.shadowBlur=10;
+  ctx.stroke(); ctx.shadowBlur=0;
+
+  // ---- Center dot ----
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
+  ctx.fillStyle='#00ffcc';
+  ctx.shadowColor='#00ffcc'; ctx.shadowBlur=16;
+  ctx.fill(); ctx.shadowBlur=0;
+
+  // ---- Crosshair at center ----
+  ctx.strokeStyle='rgba(0,255,204,0.3)'; ctx.lineWidth=0.5;
+  ctx.beginPath(); ctx.moveTo(cx,cy-12); ctx.lineTo(cx,cy+4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-12,cy); ctx.lineTo(cx+4,cy); ctx.stroke();
+}
+
+// ─── CLOCK ────────────────────────────────────────────────────
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    [n.getHours(),n.getMinutes(),n.getSeconds()]
+    .map(v=>String(v).padStart(2,'0')).join(':');
+},1000);
+
+// ─── START ────────────────────────────────────────────────────
+// Start offline until Arduino serial data is connected
+document.getElementById('connDot').className='conn-dot sim';
+document.getElementById('connLabel').textContent='OFFLINE';
+document.getElementById('modePill').className='mode-pill sim';
+document.getElementById('modePill').textContent='● OFFLINE';
+
+if (!('serial' in navigator)) {
+  document.getElementById('btnConnect').style.opacity='0.4';
+  document.getElementById('btnConnect').title='Use Google Chrome to enable Arduino connection';
+}
+
+requestAnimationFrame(draw);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
